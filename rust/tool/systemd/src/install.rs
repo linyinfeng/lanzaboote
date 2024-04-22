@@ -14,6 +14,7 @@ use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
 use crate::architecture::SystemdArchitectureExt;
+use crate::cli::Mode;
 use crate::esp::SystemdEspPaths;
 use crate::version::SystemdVersion;
 use lanzaboote_tool::architecture::Architecture;
@@ -21,50 +22,59 @@ use lanzaboote_tool::esp::EspPaths;
 use lanzaboote_tool::gc::Roots;
 use lanzaboote_tool::generation::{Generation, GenerationLink};
 use lanzaboote_tool::os_release::OsRelease;
-use lanzaboote_tool::pe;
 use lanzaboote_tool::signature::KeyPair;
 use lanzaboote_tool::utils::{file_hash, SecureTempDirExt};
+use lanzaboote_tool::{pe, uki};
 
 pub struct Installer {
+    mode: Mode,
     broken_gens: BTreeSet<u64>,
     gc_roots: Roots,
     lanzaboote_stub: PathBuf,
     systemd: PathBuf,
+    systemd_ukify: PathBuf,
     systemd_boot_loader_config: PathBuf,
     key_pair: KeyPair,
     configuration_limit: usize,
     esp_paths: SystemdEspPaths,
     generation_links: Vec<PathBuf>,
     arch: Architecture,
+    extra_ukify_args: Vec<String>,
 }
 
 impl Installer {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        mode: Mode,
         lanzaboote_stub: PathBuf,
         arch: Architecture,
         systemd: PathBuf,
+        systemd_ukify: PathBuf,
         systemd_boot_loader_config: PathBuf,
         key_pair: KeyPair,
         configuration_limit: usize,
         esp: PathBuf,
         generation_links: Vec<PathBuf>,
+        extra_ukify_args: Vec<String>,
     ) -> Self {
         let mut gc_roots = Roots::new();
         let esp_paths = SystemdEspPaths::new(esp, arch);
         gc_roots.extend(esp_paths.iter());
 
         Self {
+            mode,
             broken_gens: BTreeSet::new(),
             gc_roots,
             lanzaboote_stub,
             systemd,
+            systemd_ukify,
             systemd_boot_loader_config,
             key_pair,
             configuration_limit,
             esp_paths,
             generation_links,
             arch,
+            extra_ukify_args,
         }
     }
 
@@ -205,6 +215,36 @@ impl Installer {
             .next()
             .context("Failed to extract the kernel version.")?;
 
+        let stub_target = self
+            .esp_paths
+            .linux
+            .join(stub_name(generation, &self.key_pair.public_key)?);
+        self.gc_roots.extend([&stub_target]);
+
+        let os_release = OsRelease::from_generation(generation)
+            .context("Failed to build OsRelease from generation.")?;
+        let kernel_cmdline =
+            assemble_kernel_cmdline(&bootspec.init, bootspec.kernel_params.clone());
+
+        if let Mode::Uki = self.mode {
+            ensure_parent_dir(&stub_target);
+            uki::uki_image(
+                &stub_target,
+                &self.systemd_ukify,
+                &self.key_pair,
+                &os_release.to_string(),
+                &kernel_cmdline,
+                &bootspec.kernel,
+                bootspec
+                    .initrd
+                    .as_ref()
+                    .context("Lanzaboote does not support missing initrd yet.")?,
+                &self.extra_ukify_args,
+            )
+            .context("Failed to install systemd ukify image.")?;
+            return Ok(());
+        };
+
         // Install the kernel and record its path on the ESP.
         let kernel_target = self
             .install_nixos_ca(&bootspec.kernel, &format!("kernel-{}", kernel_version))
@@ -230,13 +270,9 @@ impl Installer {
             .context("Failed to install the initrd.")?;
 
         // Assemble, sign and install the Lanzaboote stub.
-        let os_release = OsRelease::from_generation(generation)
-            .context("Failed to build OsRelease from generation.")?;
         let os_release_path = tempdir
             .write_secure_file(os_release.to_string().as_bytes())
             .context("Failed to write os-release file.")?;
-        let kernel_cmdline =
-            assemble_kernel_cmdline(&bootspec.init, bootspec.kernel_params.clone());
         let lanzaboote_image = pe::lanzaboote_image(
             &tempdir,
             &self.lanzaboote_stub,
@@ -249,11 +285,6 @@ impl Installer {
             &self.esp_paths.esp,
         )
         .context("Failed to assemble lanzaboote image.")?;
-        let stub_target = self
-            .esp_paths
-            .linux
-            .join(stub_name(generation, &self.key_pair.public_key)?);
-        self.gc_roots.extend([&stub_target]);
         install_signed(&self.key_pair, &lanzaboote_image, &stub_target)
             .context("Failed to install the Lanzaboote stub.")?;
 

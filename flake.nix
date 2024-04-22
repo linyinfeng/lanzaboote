@@ -42,7 +42,7 @@
         # Derive the output overlay automatically from all packages that we define.
         inputs.flake-parts.flakeModules.easyOverlay
 
-        # Formatting and quality checks. 
+        # Formatting and quality checks.
       ] ++ (if inputs.pre-commit-hooks-nix ? flakeModule then [ inputs.pre-commit-hooks-nix.flakeModule ] else [ ]);
 
       flake.nixosModules.lanzaboote = moduleWithSystem (
@@ -162,7 +162,7 @@
             pname = "lzbt-systemd";
             src = ./rust/tool;
             extraArgs = {
-              TEST_SYSTEMD = pkgs.systemd;
+              TEST_SYSTEMD = pkgs.systemdUkify;
               nativeCheckInputs = with pkgs; [
                 binutils-unwrapped
                 sbsigntool
@@ -182,7 +182,8 @@
             # tell lanzatool where to find our UEFI binaries.
             makeWrapper ${tool}/bin/lzbt-systemd $out/bin/lzbt \
               --set PATH ${lib.makeBinPath [ pkgs.binutils-unwrapped pkgs.sbsigntool ]} \
-              --set LANZABOOTE_STUB ${stub}/bin/lanzaboote_stub.efi
+              --set LANZABOOTE_STUB ${stub}/bin/lanzaboote_stub.efi \
+              --set SYSTEMD_UKIFY "${pkgs.systemdUkify}/lib/systemd/ukify"
           '';
         in
         {
@@ -233,7 +234,7 @@
               config.packages.tool
             ];
 
-            TEST_SYSTEMD = pkgs.systemd;
+            TEST_SYSTEMD = pkgs.systemdUkify;
           };
         } // lib.optionalAttrs (inputs.pre-commit-hooks-nix ? flakeModule) {
           pre-commit = {
