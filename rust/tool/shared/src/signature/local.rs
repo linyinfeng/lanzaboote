@@ -115,4 +115,12 @@ impl Signer for LocalKeyPair {
         }
         Ok(true)
     }
+
+    // dirty workaround
+    fn get_public_key_path(&self) -> Result<&Path> {
+        Ok(&self.public_key)
+    }
+    fn get_private_key_path(&self) -> Result<&Path> {
+        Ok(&self.private_key)
+    }
 }

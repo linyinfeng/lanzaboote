@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 use crate::install;
 use lanzaboote_tool::{architecture::Architecture, signature::local::LocalKeyPair};
@@ -59,6 +59,20 @@ struct InstallCommand {
 
     /// List of generation links (e.g. /nix/var/nix/profiles/system-*-link)
     generations: Vec<PathBuf>,
+
+    /// Extra args for ukify if using uki mode
+    #[arg(long)]
+    extra_ukify_args: Vec<String>,
+
+    //// Stub mode
+    #[arg(long, default_value = "separate")]
+    mode: Mode,
+}
+
+#[derive(ValueEnum, Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
+    Separate,
+    Uki,
 }
 
 impl Cli {
@@ -89,6 +103,8 @@ impl Commands {
 fn install(args: InstallCommand) -> Result<()> {
     let lanzaboote_stub =
         std::env::var("LANZABOOTE_STUB").context("Failed to read LANZABOOTE_STUB env variable")?;
+    let systemd_ukify =
+        std::env::var("SYSTEMD_UKIFY").context("Failed to read SYSTEMD_UKIFY env variable")?;
 
     let local_signer = LocalKeyPair::new(
         &args.public_key.expect("Failed to obtain public key"),
@@ -96,14 +112,17 @@ fn install(args: InstallCommand) -> Result<()> {
     );
 
     install::Installer::new(
+        args.mode,
         PathBuf::from(lanzaboote_stub),
         Architecture::from_nixos_system(&args.system)?,
         args.systemd,
+        PathBuf::from(systemd_ukify),
         args.systemd_boot_loader_config,
         local_signer,
         args.configuration_limit,
         args.esp,
         args.generations,
+        args.extra_ukify_args,
     )
     .install()
 }

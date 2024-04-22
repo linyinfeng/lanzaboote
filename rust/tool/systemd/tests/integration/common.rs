@@ -157,6 +157,7 @@ pub fn lanzaboote_install(
     let mut cmd = Command::cargo_bin("lzbt-systemd")?;
     let output = cmd
         .env("LANZABOOTE_STUB", test_systemd_stub)
+        .env("SYSTEMD_UKIFY", format!("{test_systemd}/lib/systemd/ukify"))
         .arg("-vv")
         .arg("install")
         .arg("--system")
