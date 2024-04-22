@@ -19,6 +19,12 @@ in
   options.boot.lanzaboote = {
     enable = lib.mkEnableOption "Enable the LANZABOOTE";
 
+    mode = lib.mkOption {
+      type = lib.types.enum [ "separate" "uki" ];
+      default = "separate";
+      description = "Installation mode";
+    };
+
     enrollKeys = lib.mkEnableOption "Do not use this option. Only for used for integration tests! Automatic enrollment of the keys using sbctl";
 
     configurationLimit = lib.mkOption {
@@ -109,6 +115,12 @@ in
         https://uapi-group.org/specifications/specs/boot_loader_specification/#sorting
       '';
     };
+
+    extraArgs = lib.mkOption {
+      type = with lib.types; listOf str;
+      default = [ ];
+      description = "Extra arguments passed to lzbt";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -131,6 +143,7 @@ in
         # Use the system from the kernel's hostPlatform because this should
         # always, even in the cross compilation case, be the right system.
         ${lib.getExe cfg.package} install \
+          --mode ${cfg.mode} \
           --system ${config.boot.kernelPackages.stdenv.hostPlatform.system} \
           --systemd ${config.systemd.package} \
           --systemd-boot-loader-config ${loaderConfigFile} \
@@ -138,6 +151,7 @@ in
           --private-key ${cfg.privateKeyFile} \
           --configuration-limit ${toString configurationLimit} \
           ${config.boot.loader.efi.efiSysMountPoint} \
+          ${lib.escapeShellArgs cfg.extraArgs} \
           /nix/var/nix/profiles/system-*-link
       '';
     };

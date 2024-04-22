@@ -5,4 +5,5 @@ pub mod generation;
 pub mod os_release;
 pub mod pe;
 pub mod signature;
+pub mod uki;
 pub mod utils;

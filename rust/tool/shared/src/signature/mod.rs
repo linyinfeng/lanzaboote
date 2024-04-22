@@ -53,6 +53,11 @@ pub trait Signer {
     fn verify_path(&self, from: &Path) -> Result<bool> {
         self.verify(&std::fs::read(from).expect("Failed to read the path to verify"))
     }
+
+    /// Dirty workaround
+    fn get_public_key_path(&self) -> Result<&Path>;
+    /// Dirty workaround
+    fn get_private_key_path(&self) -> Result<&Path>;
 }
 
 pub mod local;
