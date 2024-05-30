@@ -1,0 +1,32 @@
+name: 'Upstream Sync'
+
+on:
+  schedule:
+    - cron:  '0 16 * * *'
+
+  workflow_dispatch:
+    inputs:
+      sync_test_mode:
+        description: 'Fork Sync Test Mode'
+        type: boolean
+        default: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    name: Sync latest commits from upstream repo
+    steps:
+    - name: Checkout target repo
+      uses: actions/checkout@main
+      with:
+        ref: uki
+    - name: Sync upstream changes
+      id: sync
+      uses: aormsby/Fork-Sync-With-Upstream-action@main
+      with:
+        target_sync_branch: uki
+        target_repo_token: ${{ secrets.PAT_FOR_AUTOMATED_UPDATE }}
+        upstream_sync_branch: master
+        upstream_sync_repo: nix-community/lanzaboote
+        upstream_repo_access_token: ${{ secrets.PAT_FOR_AUTOMATED_UPDATE }}
+        test_mode: ${{ inputs.sync_test_mode }}
