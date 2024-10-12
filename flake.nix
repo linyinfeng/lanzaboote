@@ -174,6 +174,7 @@
           wrappedTool = pkgs.runCommand "lzbt"
             {
               nativeBuildInputs = [ pkgs.makeWrapper ];
+              meta.mainProgram = "lzbt";
             } ''
             mkdir -p $out/bin
 
