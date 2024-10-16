@@ -77,11 +77,7 @@ fn check_hash(data: &[u8], expected_hash: Hash, name: &str, secure_boot: bool) -
     Ok(())
 }
 
-pub fn boot_linux(
-    handle: Handle,
-    system_table: SystemTable<Boot>,
-    dynamic_initrds: Vec<Vec<u8>>,
-) -> uefi::Result<()> {
+pub fn boot_linux(handle: Handle, dynamic_initrds: Vec<Vec<u8>>) -> uefi::Result<()> {
     // SAFETY: We get a slice that represents our currently running
     // image and then parse the PE data structures from it. This is
     // safe, because we don't touch any data in the data sections that
@@ -97,10 +93,8 @@ pub fn boot_linux(
     let mut initrd_data;
 
     {
-        let file_system = system_table
-            .boot_services()
-            .get_image_file_system(handle)
-            .expect("Failed to get file system handle");
+        let file_system =
+            uefi::boot::get_image_file_system(handle).expect("Failed to get file system handle");
         let mut file_system = FileSystem::new(file_system);
 
         kernel_data = file_system
@@ -147,5 +141,5 @@ pub fn boot_linux(
         initrd_data.append(&mut compute_pad4(initrd_data.len()));
     }
 
-    boot_linux_unchecked(handle, system_table, kernel_data, &cmdline, initrd_data)
+    boot_linux_unchecked(handle, kernel_data, &cmdline, initrd_data)
 }

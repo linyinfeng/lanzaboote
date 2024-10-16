@@ -46,7 +46,7 @@ fn print_logo() {
 }
 
 #[entry]
-fn main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
+fn main() -> Status {
     uefi::helpers::init().unwrap();
 
     print_logo();
@@ -71,7 +71,7 @@ fn main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
         }
     }
 
-    if export_efi_variables(STUB_NAME, &system_table).is_err() {
+    if export_efi_variables(STUB_NAME).is_err() {
         warn!("Failed to export stub EFI variables, some features related to measured boot will not be available");
     }
 
@@ -85,9 +85,7 @@ fn main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
         // files, nothing can open the LoadedImage protocol here.
         // Everything must use `filesystem`.
         let mut companions = Vec::new();
-        let image_fs = system_table
-            .boot_services()
-            .get_image_file_system(boot::image_handle());
+        let image_fs = uefi::boot::get_image_file_system(boot::image_handle());
 
         if let Ok(image_fs) = image_fs {
             let mut filesystem = uefi::fs::FileSystem::new(image_fs);
@@ -145,12 +143,12 @@ fn main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
 
     #[cfg(feature = "fat")]
     {
-        status = fat::boot_linux(handle, system_table, dynamic_initrds)
+        status = fat::boot_linux(boot::image_handle(), dynamic_initrds)
     }
 
     #[cfg(feature = "thin")]
     {
-        status = thin::boot_linux(handle, system_table, dynamic_initrds).status()
+        status = thin::boot_linux(boot::image_handle(), dynamic_initrds).status()
     }
 
     status
