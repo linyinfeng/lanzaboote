@@ -254,8 +254,7 @@ pub fn read_section_data<'a>(file_data: &'a [u8], section_name: &str) -> Option<
         .find(|s| s.name().unwrap() == section_name)
         .and_then(|s| {
             let section_start: usize = s.pointer_to_raw_data.try_into().ok()?;
-            assert!(s.virtual_size <= s.size_of_raw_data);
-            let section_end: usize = section_start + usize::try_from(s.virtual_size).ok()?;
+            let section_end: usize = section_start + usize::try_from(std::cmp::min(s.size_of_raw_data, s.virtual_size)).ok()?;
             Some(&file_data[section_start..section_end])
         })
 }
